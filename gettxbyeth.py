@@ -14,9 +14,6 @@ p = SimpleNamespace() # parameters to work with
 
 if __name__ == "__main__":
     
-    start = datetime.now()
-    print("[*] Start @" + str(start))
-    
     print("#### Get ethereum transactions by sent ether value ####")
     print("For the list of options, run ./" + os.path.basename(__file__) + " --help")
     print("")
@@ -47,15 +44,22 @@ if __name__ == "__main__":
    
     p.provider = infuraurl
     p.account = config["DEFAULT"]["account"]
-    p.eth_min = config["ethrange"]["min"]
-    p.eth_max = config["ethrange"]["max"]
+    p.eth_min = config["ethrange"]["min"] if config["ethrange"]["min"] else 0
+    p.eth_max = config["ethrange"]["max"] if config["ethrange"]["max"] else None   # 'None' translates to "infinity" 
+    p.block_min = config["blockrange"]["min"] if config["blockrange"]["min"] else None # 'None' translates to "latest"
+    p.block_max = config["blockrange"]["max"] if config["blockrange"]["max"] else None # 'None' translates to "latest"
     
     # overwrite settings from command line
     if args.eth_min:
         p.eth_min = args.eth_min
     if args.eth_max:
         p.eth_max = args.eth_max
-    
+    if args.block_min:
+        p.block_min = args.block_min
+    if args.block_max:
+        p.block_max = args.block_max
+   
+   
     ###### connecting to the chain
     w3 = Web3(Web3.HTTPProvider(p.provider))
     if w3.isConnected():
@@ -69,18 +73,48 @@ if __name__ == "__main__":
     # print("Balance: " + str(w3.fromWei(w3.eth.getBalance(account),"ether")) + " ETH")
     
     latestblock = w3.eth.getBlock("latest")
+    ethmin_wei = w3.toWei(p.eth_min, "ether")
+    ethmax_wei = None if p.eth_max is None else w3.toWei(p.eth_max, "ether")
+    blockmin = int(p.block_min if p.block_min else latestblock.number)
+    blockmax = int(p.block_max if p.block_max else latestblock.number)
     
+    print(F"Latest block: {latestblock.number}")
+    print(F"Block range: {blockmin} - {blockmax} ({blockmax-blockmin+1} {'blocks' if blockmax-blockmin>0 else 'block'})")
+    print(F"Min ether: {p.eth_min} ({ethmin_wei} wei)")
+    print(F"Max ether: {p.eth_max if p.eth_max else 'no upper limit'} ({ethmax_wei if ethmax_wei else 'infinite'} wei)")
+    
+    '''
     print("Block no.: " + str(latestblock.number))
     print("No. of tx in block: " + str(len(latestblock.transactions)))
     print("Min eth: " + str(p.eth_min) + " ETH (" + str(w3.toWei(p.eth_min, "ether")) + " wei)")
     print("Max eth: " + str(p.eth_max) + " ETH (" + str(w3.toWei(p.eth_max, "ether")) + " wei)")
+    '''
     
-    for tx in latestblock.transactions:
-        t = w3.eth.getTransaction(tx)
-        if t.value > w3.toWei(p.eth_min, "ether") and t.value < w3.toWei(p.eth_max, "ether"):
-            print(str(t.hash.hex()) + ": ", end="")
-            print(str(t.value))
+    start = datetime.now()
+    print("")
+    print("[*] Start @" + str(start),end="\n\n")
+    
+    sumofeth = 0
+    numoftx = 0
+    for blocknum in range(blockmin,blockmax+1):
+        block = w3.eth.getBlock(blocknum)
+        print(F"### Block no. {block.number} ###")
+        print(F"[*] No. of tx in block: {len(block.transactions)}")
+        for tx in block.transactions:
+            t = w3.eth.getTransaction(tx)
+            if (t.value >= ethmin_wei and not p.eth_max) or \
+               (t.value >= ethmin_wei and t.value <= ethmax_wei):
+                   print(F"{str(t.hash.hex())}: {w3.fromWei(t.value,'ether')} ETH ({t.value} wei)")
+                   sumofeth += t.value
+                   numoftx += 1
+        print("")
+    
+    print("")
+    print(F"Number of filtered tx : {numoftx}")
+    print(F"Sum transfered in these transactions: {w3.fromWei(sumofeth,'ether')} ETH ({sumofeth} wei)")
+            
     end = datetime.now()
+    print("")
     print("[*] End @"+str(end))
     print("[*] Elapsed time: " + str(end-start))
 
