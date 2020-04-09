@@ -12,38 +12,80 @@ configfile = "config.ini"
 p = SimpleNamespace() # parameters to work with
                       # populate from config file then overwrite from command line
 
+description = F"""
+Get ethereum transactions by sent ether value. 
+"""
+
+epilog = F"""
+Have fun!
+"""
+
 if __name__ == "__main__":
     
-    print("#### Get ethereum transactions by sent ether value ####")
-    print("For the list of options, run ./" + os.path.basename(__file__) + " --help")
-    print("")
+    print(F"For the list of options, run ./{os.path.basename(__file__)} -h")
     
     # parsing command line arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c","--config-file",help="Use this config file (default: "+configfile+")")
-    parser.add_argument("-p","--provider",help="Provider to use to connect to the chain")
-    parser.add_argument("-w","--eth-min", help="Minimum ether value to filter for (default: 0)")
-    parser.add_argument("-r","--eth-max", help="Maximum ether value to filter for (default: infinite)")
-    #parser.add_argument("-l","--latest", help="When set with no parameter, the latest block will be analyzed
-    parser.add_argument("-v","--block-min", help="Minimum block number to filter for (default: latest)")
-    parser.add_argument("-n","--block-max", help="Maximum block number to filter for (default: latest)")
+    parser = argparse.ArgumentParser(description=description, epilog=epilog) 
+    configOptions = parser.add_argument_group("Config options")
+    blockOptions = parser.add_argument_group("Block options")
+    etherOptions = parser.add_argument_group("Ether options")
+    #outputOptions = parser.add_argument_group("Output options")
+        # etherscan link -oL --out-etherscanio
+        # csv            -oC --out-csv
+        # normal         -oN --out-normal
+    # miscOptions = parser.add_argument_group("Miscellaneous options")
+        # print latest block number and exit
+        
+    configOptions.add_argument("-c","--config-file",help="Use this config file (default: "+configfile+")")
+    configOptions.add_argument("-p","--provider",help="Provider to use to connect to the chain")
+    
+    blockOptions.add_argument("-b","--block",help="Filter in an exact block (all other block options are ignored)", type=int)
+    blockOptions.add_argument("-l","--latest", help="Filter in the last N blocks or only in the latest block if no value specified.", nargs='?', default=-1, metavar="N", type=int)
+    blockOptions.add_argument("-v","--block-min", help="Minimum block number to filter in", type=int)
+    blockOptions.add_argument("-n","--block-max", help="Maximum block number to filter in", type=int)
+    # in the last x minute/hour/day
+    
+    etherOptions.add_argument("-s","--skip-zero", help="Don't list transactions with 0 ETH (other ether options still apply)", action='store_true')
+    etherOptions.add_argument("-0","--zero-only", help="List transactions with 0 ETH only (other ether options are ignored)", action='store_true')
+    etherOptions.add_argument("-E","--exact-eth", help="List txs only with this exact ETH value.")
+    # etherOptions.add_argument("-W","--exact-wei", help="List txs only with this exact wei value")
+    etherOptions.add_argument("-w","--eth-min", help="Minimum value in ETH to filter for", type=float)
+    etherOptions.add_argument("-r","--eth-max", help="Maximum value in ETH to filter for", type=float)
+    #etherOptions.add_argument("-q","--wei-min", help="Minimum ether value in wei to filter for", type=float)
+    #etherOptions.add_argument("-e","--wei-max", help="Maximum ether value in wei to filter for", type=float)
+    
     args = parser.parse_args()
     
+    p = args
+    #print(p)
+    #exit(-1)
+    
+    '''
     # parsing config file
     config = configparser.ConfigParser()    
     config.optionxform = str  # to preserve case of parameters in the config file
     
+    # set defaults
+    p.provider = ""
+    p.block_min = None
+    p.block_max = None
+    p.latest = None
+    p.eth_min = 0
+    p.eth_max = None
+    p.skip_zero = False
+    p.zero_only = False
+    
+    
+    # read from config file
     if args.config_file:
         configfile = args.config_file
         config.read(configfile)
         
         p.provider = config["infura"]["url"]  
-        p.eth_min = config["ethrange"]["min"] if config["ethrange"]["min"] else 0
-        p.eth_max = config["ethrange"]["max"] if config["ethrange"]["max"] else None   # 'None' translates to "infinity" 
-        p.block_min = config["blockrange"]["min"] if config["blockrange"]["min"] else None # 'None' translates to "latest"
-        p.block_max = config["blockrange"]["max"] if config["blockrange"]["max"] else None # 'None' translates to "latest"
-    
-    
+        p.eth_min = config["ethrange"]["min"]
+        p.eth_max = config["ethrange"]["max"]
+        p.block_min = config["blockrange"]["min"]
+        p.block_max = config["blockrange"]["max"] 
     
     # overwrite settings from command line
     if args.provider:
@@ -56,12 +98,12 @@ if __name__ == "__main__":
         p.block_min = args.block_min
     if args.block_max:
         p.block_max = args.block_max
+    '''
    
-    ###### connecting to the chain
-    
+    ###### connecting to the chain    
     print(F"[*] Provider to use: ", end="")
     providerselect = [False,False,False,False] # http, ws, ipc, auto
-    if hasattr(p,'provider') and len(p.provider)>0: 
+    if len(p.provider)>0: 
         if p.provider[:4].lower() == "http":
             print(F"{p.provider} (treat as 'http' provider)")
             providerselect[0] = True
@@ -76,7 +118,7 @@ if __name__ == "__main__":
         providerselect[3] = True
         
     
-    print("[*] Connecting...")    
+    print("[*] Connecting...", end="")    
     if providerselect[0]: # http
         w3 = Web3(Web3.HTTPProvider(p.provider))        
     if providerselect[1]: # websocket
@@ -88,24 +130,47 @@ if __name__ == "__main__":
     
     
     if w3.isConnected():
-        print(F"[*] Successful, connected to {p.provider}")
+        print(" success, we are now connected!")
     else:
-        print("[!] Not connected, exiting...")
+        print(" could not connect. Exiting...")
         exit(-1)
     
-    # let every parameter be fine
+    # let every parameter be fine, set defaults if necessary
     latestblock = w3.eth.getBlock("latest")
-    ethmin_wei = w3.toWei(p.eth_min, "ether")
-    ethmax_wei = None if p.eth_max is None else w3.toWei(p.eth_max, "ether")
-    blockmin = int(p.block_min if p.block_min else latestblock.number)
-    blockmax = int(p.block_max if p.block_max else latestblock.number)
-   
-   
+    
+    # block settings
+    if p.block is not None:  # -b/--block
+        blockmin = p.block
+        blockmax = p.block
+    elif p.latest != -1:    
+        if p.latest is None:
+            blockmin = latestblock.number
+            blockmax = latestblock.number
+        else:
+            blockmin = latestblock.number - p.latest + 1
+            blockmax = latestblock.number
+    else:
+        blockmin = int(p.block_min if p.block_min is not None else latestblock.number) 
+        blockmax = int(p.block_max if p.block_max is not None else latestblock.number)
+    
+    # ether settings
+    if p.zero_only:
+        ethmin_wei = 0
+        ethmax_wei = 0
+    elif p.exact_eth is not None:
+        ethmin_wei = w3.toWei(p.exact_eth, "ether")
+        ethmax_wei = w3.toWei(p.exact_eth, "ether")
+    else:
+        ethmin_wei = w3.toWei(p.eth_min, "ether") if p.eth_min is not None else 0
+        ethmax_wei = w3.toWei(p.eth_max, "ether") if p.eth_max is not None else None
     
     print(F"Latest block: {latestblock.number}")
     print(F"Block range: {blockmin} - {blockmax} ({blockmax-blockmin+1} {'blocks' if blockmax-blockmin>0 else 'block'})")
-    print(F"Min ether: {p.eth_min} ({ethmin_wei} wei)")
-    print(F"Max ether: {p.eth_max if p.eth_max else 'no upper limit'} ({ethmax_wei if ethmax_wei else 'infinite'} wei)")
+    print(F"Min ether: {w3.fromWei(ethmin_wei,'ether') } ({ethmin_wei} wei)")
+    print(F"Max ether: {w3.fromWei(ethmax_wei,'ether') if ethmax_wei is not None else 'no upper limit'} ({ethmax_wei if ethmax_wei is not None else 'infinite'} wei)")
+    if p.skip_zero:
+        print("Not showing transactions with 0 ETH value") 
+    
     
     start = datetime.now()
     print("")
@@ -116,19 +181,31 @@ if __name__ == "__main__":
     for blocknum in range(blockmin,blockmax+1):
         block = w3.eth.getBlock(blocknum)
         print(F"### Block no. {block.number} ###")
-        print(F"[*] No. of tx in block: {len(block.transactions)}")
+        print(F"[*] No. of txs in block: {len(block.transactions)}")
+        sumofethinblock = 0
+        numoftxinblock = 0
         for tx in block.transactions:
             t = w3.eth.getTransaction(tx)
-            if (t.value >= ethmin_wei and not p.eth_max) or \
+            if (t.value >= ethmin_wei and ethmax_wei is None) or \
                (t.value >= ethmin_wei and t.value <= ethmax_wei):
+                   
+                   if t.value==0 and p.skip_zero and p.zero_only is False:
+                       continue
+                        
                    print(F"{str(t.hash.hex())}: {w3.fromWei(t.value,'ether')} ETH ({t.value} wei)")
                    sumofeth += t.value
                    numoftx += 1
+                   sumofethinblock += t.value
+                   numoftxinblock += 1
         print("")
-    
+        print(F"Number of filtered txs in this block: {numoftxinblock}")
+        print(F"Sum transfered in these transactions in this block: {w3.fromWei(sumofethinblock,'ether')} ETH ({sumofethinblock} wei)")
+        print("")
+        
     print("")
-    print(F"Number of filtered tx: {numoftx}")
-    print(F"Sum transfered in these transactions: {w3.fromWei(sumofeth,'ether')} ETH ({sumofeth} wei)")
+    print("------------------------------------------")
+    print(F"Total number of filtered txs: {numoftx}")
+    print(F"Total sum transfered in these transactions: {w3.fromWei(sumofeth,'ether')} ETH ({sumofeth} wei)")
             
     end = datetime.now()
     print("")
