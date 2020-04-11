@@ -20,6 +20,12 @@ epilog = F"""
 Have fun!
 """
 
+eio_block_base = "https://etherscan.io/block/" 
+eio_tx_base = "https://etherscan.io/tx/"
+
+csv_columns = ("#","Value (ETH)","Value (wei)","Tx id","Tx link","Block number","Block link")
+csv_delimiter = ";"
+
 if __name__ == "__main__":
     
     print(F"For the list of options, run ./{os.path.basename(__file__)} -h")
@@ -29,10 +35,7 @@ if __name__ == "__main__":
     configOptions = parser.add_argument_group("Config options")
     blockOptions = parser.add_argument_group("Block options")
     etherOptions = parser.add_argument_group("Ether options")
-    #outputOptions = parser.add_argument_group("Output options")
-        # etherscan link -oL --out-etherscanio
-        # csv            -oC --out-csv
-        # normal         -oN --out-normal
+    outputOptions = parser.add_argument_group("Output options")
     # miscOptions = parser.add_argument_group("Miscellaneous options")
         # print latest block number and exit
         
@@ -53,6 +56,13 @@ if __name__ == "__main__":
     etherOptions.add_argument("-r","--eth-max", help="Maximum value in ETH to filter for", type=float)
     #etherOptions.add_argument("-q","--wei-min", help="Minimum ether value in wei to filter for", type=float)
     #etherOptions.add_argument("-e","--wei-max", help="Maximum ether value in wei to filter for", type=float)
+    
+    outputOptions.add_argument("-oT","--out-etherscanio", help="Generate etherscan.io link for the tx", action="store_true")
+    outputOptions.add_argument("-oB","--out-block", help="Generate etherscan.io link for the block", action="store_true")
+    #outputOptions.add_argument("-oH","--out-html", help="Generate html output", metavar="<filename>")
+    #outputOptions.add_argument("-oF","--out-console", help="Save console output", metavar="<filename>")
+    #outputOptions.add_argument("-oC","--out-csv", help="Save csv output", metavar="<filename>")
+    #outputOptions.add_argument("-oA","--out-files", help="Save to every available file format", metavar="<filename>")
     
     args = parser.parse_args()
     
@@ -105,16 +115,16 @@ if __name__ == "__main__":
     providerselect = [False,False,False,False] # http, ws, ipc, auto
     if len(p.provider)>0: 
         if p.provider[:4].lower() == "http":
-            print(F"{p.provider} (treat as 'http' provider)")
+            print(F"{p.provider} (treated as 'http' provider)")
             providerselect[0] = True
         elif p.provider[:2].lower() == "ws":
-            print(F"{p.provider} (treat as 'ws' provider)")
+            print(F"{p.provider} (treated as 'ws' provider)")
             providerselect[1] = True
         else:
-            print(F"{p.provider} (treat as 'ipc' provider)")
+            print(F"{p.provider} (treated as 'ipc' provider)")
             providerselect[2] = True
     else:
-        print("not set, trying web3's auto connect")   
+        print("not specified, trying web3's auto connect")   
         providerselect[3] = True
         
     
@@ -130,7 +140,7 @@ if __name__ == "__main__":
     
     
     if w3.isConnected():
-        print(" success, we are now connected!")
+        print(" success, we are now connected!",end="\n\n")
     else:
         print(" could not connect. Exiting...")
         exit(-1)
@@ -182,6 +192,8 @@ if __name__ == "__main__":
         block = w3.eth.getBlock(blocknum)
         print(F"### Block no. {block.number} ###")
         print(F"[*] No. of txs in block: {len(block.transactions)}")
+        if p.out_block:
+            print(F"[*] {eio_block_base}{block.number}", end="\n\n")
         sumofethinblock = 0
         numoftxinblock = 0
         for tx in block.transactions:
@@ -193,19 +205,22 @@ if __name__ == "__main__":
                        continue
                         
                    print(F"{str(t.hash.hex())}: {w3.fromWei(t.value,'ether')} ETH ({t.value} wei)")
+                   if p.out_etherscanio:
+                       print(F"{eio_tx_base}{t.hash.hex()}", end="\n\n")                       
+                       
                    sumofeth += t.value
                    numoftx += 1
                    sumofethinblock += t.value
                    numoftxinblock += 1
         print("")
         print(F"Number of filtered txs in this block: {numoftxinblock}")
-        print(F"Sum transfered in these transactions in this block: {w3.fromWei(sumofethinblock,'ether')} ETH ({sumofethinblock} wei)")
+        print(F"Sum transfered in these txs in this block: {w3.fromWei(sumofethinblock,'ether')} ETH ({sumofethinblock} wei)")
         print("")
         
     print("")
     print("------------------------------------------")
     print(F"Total number of filtered txs: {numoftx}")
-    print(F"Total sum transfered in these transactions: {w3.fromWei(sumofeth,'ether')} ETH ({sumofeth} wei)")
+    print(F"Total sum transfered in these txs: {w3.fromWei(sumofeth,'ether')} ETH ({sumofeth} wei)")
             
     end = datetime.now()
     print("")
