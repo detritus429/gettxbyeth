@@ -8,10 +8,67 @@ from datetime import datetime
 
 from web3 import Web3
 
+f_console = None
+f_csv = None
+f_html = None
+
+def write_to_console(line, end="\n"):
+    """Write line to console and the same to file if necessary"""
+    
+    print(line,end=end)
+    
+    if f_console is not None:
+        print(line, file=f_console, end=end, flush=True)
+
+csv_columns = ("#","#b","Value (ETH)","Value (wei)","Tx id","Tx link","Block number","Block link")
+csv_delimiter = ";"
+
+def getCSVLine(data):
+    """Data is a tuple of (n,nb,value_wei,tx_id,block_number)."""
+    """
+        n = data[0]  # number in all
+        nb = data[1]  # number in block
+        eth = w3.fromWei(wei,'ether')
+        wei = data[2]
+        tx = data[1]
+        txlink = getTxLink(tx)
+        block = data[2]
+        blockLink = getBlockLink(block)
+    """
+   
+    # csv_columns = ("#","#b","Value (ETH)","Value (wei)","Tx id","Tx link","Block number","Block link")
+    #  0 1    2         3       4
+    # (n,nb,value_wei,tx_id,block_number)
+    return F"{data[0]}{csv_delimiter}\
+{data[1]}{csv_delimiter}\
+{w3.fromWei(data[2],'ether')}{csv_delimiter}\
+{data[2]}{csv_delimiter}\
+{data[3]}{csv_delimiter}\
+{getTxLink(data[3])}{csv_delimiter}\
+{data[4]}{csv_delimiter}\
+{getBlockLink(data[4])}"  # end of getCSVLine
+
+
+def getHtmlLine(data):
+    return ""
+
+
+eio_block_base = "https://etherscan.io/block/" 
+eio_tx_base = "https://etherscan.io/tx/"
+
+def getTxLink(tx):
+    """Returns the etherscan.io link of the tx"""
+    return F"{eio_tx_base}{tx}"
+
+def getBlockLink(b):
+    """Returns the etherscan.io link of the block number"""
+    return F"{eio_block_base}{b}"
+
 configfile = "config.ini"
 p = SimpleNamespace() # parameters to work with
                       # populate from config file then overwrite from command line
 
+# big strings
 description = F"""
 Get ethereum transactions by sent ether value. 
 """
@@ -20,11 +77,15 @@ epilog = F"""
 Have fun!
 """
 
-eio_block_base = "https://etherscan.io/block/" 
-eio_tx_base = "https://etherscan.io/tx/"
+# nem jo igy, jo lenne kitolteni a title-t valamivel
+htmlstart = """
+<html>
+"""
 
-csv_columns = ("#","Value (ETH)","Value (wei)","Tx id","Tx link","Block number","Block link")
-csv_delimiter = ";"
+htmlend = """
+</body></html>
+"""
+
 
 if __name__ == "__main__":
     
@@ -36,8 +97,6 @@ if __name__ == "__main__":
     blockOptions = parser.add_argument_group("Block options")
     etherOptions = parser.add_argument_group("Ether options")
     outputOptions = parser.add_argument_group("Output options")
-    # miscOptions = parser.add_argument_group("Miscellaneous options")
-        # print latest block number and exit
         
     configOptions.add_argument("-c","--config-file",help="Use this config file (default: "+configfile+")")
     configOptions.add_argument("-p","--provider",help="Provider to use to connect to the chain")
@@ -59,16 +118,20 @@ if __name__ == "__main__":
     
     outputOptions.add_argument("-oT","--out-etherscanio", help="Generate etherscan.io link for the tx", action="store_true")
     outputOptions.add_argument("-oB","--out-block", help="Generate etherscan.io link for the block", action="store_true")
-    #outputOptions.add_argument("-oH","--out-html", help="Generate html output", metavar="<filename>")
-    #outputOptions.add_argument("-oF","--out-console", help="Save console output", metavar="<filename>")
-    #outputOptions.add_argument("-oC","--out-csv", help="Save csv output", metavar="<filename>")
-    #outputOptions.add_argument("-oA","--out-files", help="Save to every available file format", metavar="<filename>")
+    outputOptions.add_argument("-oH","--out-html", help="Generate html output", metavar="<filename>")
+    outputOptions.add_argument("-oF","--out-console", help="Save console output", metavar="<filename>")
+    outputOptions.add_argument("-oC","--out-csv", help="Save csv output", metavar="<filename>")
+    outputOptions.add_argument("-oA","--out-files", help="Save to every available file format", metavar="<filename>")
     
     args = parser.parse_args()
     
     p = args
     #print(p)
     #exit(-1)
+    
+    # output files
+    if p.out_console is not None or p.out_files is not None:
+        f_console = open(p.out_console,"w")
     
     '''
     # parsing config file
@@ -111,24 +174,24 @@ if __name__ == "__main__":
     '''
    
     ###### connecting to the chain    
-    print(F"[*] Provider to use: ", end="")
+    write_to_console(F"[*] Provider to use: ", end="")
     providerselect = [False,False,False,False] # http, ws, ipc, auto
     if len(p.provider)>0: 
         if p.provider[:4].lower() == "http":
-            print(F"{p.provider} (treated as 'http' provider)")
+            write_to_console(F"{p.provider} (treated as 'http' provider)")
             providerselect[0] = True
         elif p.provider[:2].lower() == "ws":
-            print(F"{p.provider} (treated as 'ws' provider)")
+            write_to_console(F"{p.provider} (treated as 'ws' provider)")
             providerselect[1] = True
         else:
-            print(F"{p.provider} (treated as 'ipc' provider)")
+            write_to_console(F"{p.provider} (treated as 'ipc' provider)")
             providerselect[2] = True
     else:
-        print("not specified, trying web3's auto connect")   
+        write_to_console("not specified, trying web3's auto connect")   
         providerselect[3] = True
         
     
-    print("[*] Connecting...", end="")    
+    write_to_console("[*] Connecting...", end="")    
     if providerselect[0]: # http
         w3 = Web3(Web3.HTTPProvider(p.provider))        
     if providerselect[1]: # websocket
@@ -140,9 +203,11 @@ if __name__ == "__main__":
     
     
     if w3.isConnected():
-        print(" success, we are now connected!",end="\n\n")
+        write_to_console(" success, we are now connected!",end="\n\n")
     else:
-        print(" could not connect. Exiting...")
+        write_to_console(" could not connect. Exiting...")
+        if f_console is not None:
+            f_console.close()    
         exit(-1)
     
     # let every parameter be fine, set defaults if necessary
@@ -174,26 +239,36 @@ if __name__ == "__main__":
         ethmin_wei = w3.toWei(p.eth_min, "ether") if p.eth_min is not None else 0
         ethmax_wei = w3.toWei(p.eth_max, "ether") if p.eth_max is not None else None
     
-    print(F"Latest block: {latestblock.number}")
-    print(F"Block range: {blockmin} - {blockmax} ({blockmax-blockmin+1} {'blocks' if blockmax-blockmin>0 else 'block'})")
-    print(F"Min ether: {w3.fromWei(ethmin_wei,'ether') } ({ethmin_wei} wei)")
-    print(F"Max ether: {w3.fromWei(ethmax_wei,'ether') if ethmax_wei is not None else 'no upper limit'} ({ethmax_wei if ethmax_wei is not None else 'infinite'} wei)")
+    write_to_console(F"Latest block: {latestblock.number}")
+    write_to_console(F"Block range: {blockmin} - {blockmax} ({blockmax-blockmin+1} {'blocks' if blockmax-blockmin>0 else 'block'})")
+    write_to_console(F"Min ether: {w3.fromWei(ethmin_wei,'ether') } ({ethmin_wei} wei)")
+    write_to_console(F"Max ether: {w3.fromWei(ethmax_wei,'ether') if ethmax_wei is not None else 'no upper limit'} ({ethmax_wei if ethmax_wei is not None else 'infinite'} wei)")
     if p.skip_zero:
-        print("Not showing transactions with 0 ETH value") 
+        write_to_console("Not showing transactions with 0 ETH value") 
     
+    # open output files
+    if p.out_csv is not None or p.out_files is not None:
+        f_csv = open(p.out_csv,"w")
+        print(csv_delimiter.join(csv_columns),file=f_csv,flush=True)
+    
+    if p.out_html is not None or p.out_files is not None:
+        f_html = open(p.out_html,"w")
+        print(htmlstart,file=f_html,flush=True)
+
     
     start = datetime.now()
-    print("")
-    print("[*] Start @" + str(start),end="\n\n")
+    write_to_console("")
+    write_to_console("[*] Start @" + str(start),end="\n\n")
+
     
     sumofeth = 0
     numoftx = 0
     for blocknum in range(blockmin,blockmax+1):
         block = w3.eth.getBlock(blocknum)
-        print(F"### Block no. {block.number} ###")
-        print(F"[*] No. of txs in block: {len(block.transactions)}")
+        write_to_console(F"### Block no. {block.number} ###")
+        write_to_console(F"[*] No. of txs in block: {len(block.transactions)}")
         if p.out_block:
-            print(F"[*] {eio_block_base}{block.number}", end="\n\n")
+            write_to_console(F"[*] {getBlockLink(block.number)}", end="\n\n")
         sumofethinblock = 0
         numoftxinblock = 0
         for tx in block.transactions:
@@ -203,28 +278,56 @@ if __name__ == "__main__":
                    
                    if t.value==0 and p.skip_zero and p.zero_only is False:
                        continue
-                        
-                   print(F"{str(t.hash.hex())}: {w3.fromWei(t.value,'ether')} ETH ({t.value} wei)")
+                   
+                   txstr = str(t.hash.hex()) # tx hash as string
+                   
+                   write_to_console(F"{txstr}: {w3.fromWei(t.value,'ether')} ETH ({t.value} wei)")
+                   
                    if p.out_etherscanio:
-                       print(F"{eio_tx_base}{t.hash.hex()}", end="\n\n")                       
-                       
+                       write_to_console(F"{getTxLink(txstr)}", end="\n\n")  
+                   
                    sumofeth += t.value
                    numoftx += 1
                    sumofethinblock += t.value
                    numoftxinblock += 1
-        print("")
-        print(F"Number of filtered txs in this block: {numoftxinblock}")
-        print(F"Sum transfered in these txs in this block: {w3.fromWei(sumofethinblock,'ether')} ETH ({sumofethinblock} wei)")
-        print("")
+                   
+                   data = (numoftx,numoftxinblock,t.value,txstr,block.number)   # (n,nb,value_wei,tx_id,block_number)
+                                        
+                   if f_csv is not None:
+                       print(getCSVLine(data),file=f_csv)
+                       
+                   if f_html is not None:
+                       print(getHtmlLine(data),file=f_html)
+                   
+        if f_csv is not None:
+            f_csv.flush()
+        if f_html is not None:
+            f_html.flush()
+            
+        write_to_console("")
+        write_to_console(F"Number of filtered txs in this block: {numoftxinblock}")
+        write_to_console(F"Sum transfered in these txs in this block: {w3.fromWei(sumofethinblock,'ether')} ETH ({sumofethinblock} wei)")
+        write_to_console("")
         
-    print("")
-    print("------------------------------------------")
-    print(F"Total number of filtered txs: {numoftx}")
-    print(F"Total sum transfered in these txs: {w3.fromWei(sumofeth,'ether')} ETH ({sumofeth} wei)")
+    write_to_console("")
+    write_to_console("------------------------------------------")
+    write_to_console(F"Total number of filtered txs: {numoftx}")
+    write_to_console(F"Total sum transfered in these txs: {w3.fromWei(sumofeth,'ether')} ETH ({sumofeth} wei)")
             
     end = datetime.now()
-    print("")
-    print("[*] End @"+str(end))
-    print("[*] Elapsed time: " + str(end-start))
+    write_to_console("")
+    write_to_console("[*] End @"+str(end))
+    write_to_console("[*] Elapsed time: " + str(end-start))
+    
+    if f_console is not None:
+        f_console.close()    
+    
+    if f_csv is not None:
+        f_csv.close()
+    
+    if f_html is not None:
+        print(htmlend,file=f_html)
+        f_html.close()
 
+    
 
