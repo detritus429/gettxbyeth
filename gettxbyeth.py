@@ -12,6 +12,10 @@ f_console = None
 f_csv = None
 f_html = None
 
+configfile = "config.ini"
+p = SimpleNamespace() # parameters to work with
+                      # populate from config file then overwrite from command line
+
 def write_to_console(line, end="\n"):
     """Write line to console and the same to file if necessary"""
     
@@ -48,9 +52,93 @@ def getCSVLine(data):
 {data[4]}{csv_delimiter}\
 {getBlockLink(data[4])}"  # end of getCSVLine
 
+# html start
+#                    0               1           2       3        4         5
+# addHtmlStart((latestblock.number,blockmin,blockmax,ethmin_wei,ethmax_wei,start))
+def addHtmlStart(settings):
+    latestblock = settings[0]
+    blockmin = settings[1]
+    blockmax = settings[2]
+    ethmin_wei = settings[3] 
+    ethmax_wei = settings[4] if settings[4] is not None else "infinite"
+    start = settings[5]
+    ethmin = w3.fromWei(ethmin_wei,'ether')
+    ethmax = w3.fromWei(ethmax_wei,'ether') if settings[4] is not None else "infinite"
+    
+    return F"""
+<html><title>ETH range: {ethmin} - {ethmax} | Blockrange: {blockmin}-{blockmax}</title><body>
+<h1>Settings</h1>
 
-def getHtmlLine(data):
-    return ""
+<table>
+<tr>
+    <td>Latest block:</td>
+    <td>{latestblock}</td>
+</tr>
+<tr>
+    <td>Block range:</td>
+    <td>{blockmin} - {blockmax} ({blockmax-blockmin+1} {'blocks' if blockmax-blockmin>0 else 'block'})</td>
+</tr>
+<tr>
+    <td>ETH range:</td>
+    <td>{ethmin}-{ethmax} ETH ({ethmin_wei}-{ethmax} wei) </td>
+</tr>
+</table>
+
+<hr/>
+Started @{start} <br/><br/>
+<table>
+<tr>
+<td>#</td>
+<td># in block</td>
+<td>Value (eth)</td>
+<td>Value (wei)</td>
+<td>tx hash</td>
+<td>block number</td>
+<tr>
+"""
+#            0       1               2     3      4
+# data = (numoftx,numoftxinblock,t.value,txstr,block.number)   # (n,nb,value_wei,tx_id,block_number)
+def addHtmlLine(data):
+    return F"""
+<tr>
+    <td>{data[0]}</td>
+    <td>{data[1]}</td>
+    <td>{w3.fromWei(data[2],'ether')}</td>
+    <td>{data[2]}</td>
+    <td><a href={getTxLink(data[3])}>{data[3]}</a></td>
+    <td><a href={getBlockLink(data[4])}>{data[4]}</a></td>
+<tr>
+"""
+
+def addHtmlBlockSummary(data):
+    return F"""
+    
+    
+    
+    """
+#               0       1           2       3
+# results = (numoftx, sumofeth, str(end),str(end-start))
+def addHtmlEnd(data):
+    return F"""</table>
+<br/>
+End: {data[2]}<br/>
+Elapsed time: {data[3]}
+<hr/>
+<table>
+<tr>
+    <td> Total number of txs:</td>
+    <td> {data[0]}</td>
+</tr>
+<tr>
+    <td> Total ETHs transfered:</td>
+    <td>{w3.fromWei(sumofeth,'ether')} ({sumofeth})</td>
+</tr>
+
+</table>
+</body></html>
+"""
+# html end
+
 
 
 eio_block_base = "https://etherscan.io/block/" 
@@ -64,10 +152,6 @@ def getBlockLink(b):
     """Returns the etherscan.io link of the block number"""
     return F"{eio_block_base}{b}"
 
-configfile = "config.ini"
-p = SimpleNamespace() # parameters to work with
-                      # populate from config file then overwrite from command line
-
 # big strings
 description = F"""
 Get ethereum transactions by sent ether value. 
@@ -76,16 +160,6 @@ Get ethereum transactions by sent ether value.
 epilog = F"""
 Have fun!
 """
-
-# nem jo igy, jo lenne kitolteni a title-t valamivel
-htmlstart = """
-<html>
-"""
-
-htmlend = """
-</body></html>
-"""
-
 
 if __name__ == "__main__":
     
@@ -98,10 +172,10 @@ if __name__ == "__main__":
     etherOptions = parser.add_argument_group("Ether options")
     outputOptions = parser.add_argument_group("Output options")
         
-    configOptions.add_argument("-c","--config-file",help="Use this config file (default: "+configfile+")")
+    #configOptions.add_argument("-c","--config-file",help="Use this config file (default: "+configfile+")")
     configOptions.add_argument("-p","--provider",help="Provider to use to connect to the chain")
     
-    blockOptions.add_argument("-b","--block",help="Filter in an exact block (all other block options are ignored)", type=int)
+    blockOptions.add_argument("-b","--block",help="Filter in this exact block (all other block options are ignored)", type=int)
     blockOptions.add_argument("-l","--latest", help="Filter in the last N blocks or only in the latest block if no value specified.", nargs='?', default=-1, metavar="N", type=int)
     blockOptions.add_argument("-v","--block-min", help="Minimum block number to filter in", type=int)
     blockOptions.add_argument("-n","--block-max", help="Maximum block number to filter in", type=int)
@@ -126,11 +200,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     p = args
-    #print(p)
-    #exit(-1)
+    # print(p)
+    # exit(-1)
     
     # output files
-    if p.out_console is not None or p.out_files is not None:
+    if p.out_files is not None:
+        p.out_console = p.out_files + ".txt"
+        p.out_csv = p.out_files + ".csv"
+        p.out_html = p.out_files + ".html"
+    
+    if p.out_console is not None:
         f_console = open(p.out_console,"w")
     
     '''
@@ -247,19 +326,22 @@ if __name__ == "__main__":
         write_to_console("Not showing transactions with 0 ETH value") 
     
     # open output files
-    if p.out_csv is not None or p.out_files is not None:
+    if p.out_csv is not None:
         f_csv = open(p.out_csv,"w")
         print(csv_delimiter.join(csv_columns),file=f_csv,flush=True)
     
-    if p.out_html is not None or p.out_files is not None:
+    if p.out_html is not None:
         f_html = open(p.out_html,"w")
-        print(htmlstart,file=f_html,flush=True)
-
+        
     
     start = datetime.now()
+    
+    if f_html is not None:
+        print(addHtmlStart((latestblock.number,blockmin,blockmax,ethmin_wei,ethmax_wei,start)),file=f_html,flush=True)
+    
     write_to_console("")
     write_to_console("[*] Start @" + str(start),end="\n\n")
-
+    
     
     sumofeth = 0
     numoftx = 0
@@ -297,7 +379,7 @@ if __name__ == "__main__":
                        print(getCSVLine(data),file=f_csv)
                        
                    if f_html is not None:
-                       print(getHtmlLine(data),file=f_html)
+                       print(addHtmlLine(data),file=f_html)
                    
         if f_csv is not None:
             f_csv.flush()
@@ -326,7 +408,8 @@ if __name__ == "__main__":
         f_csv.close()
     
     if f_html is not None:
-        print(htmlend,file=f_html)
+        results = (numoftx, sumofeth, str(end),str(end-start))
+        print(addHtmlEnd(results),file=f_html)
         f_html.close()
 
     

@@ -1,6 +1,7 @@
 # gettxbyeth developer
 config_dev.ini
 TODO
+*.html
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
