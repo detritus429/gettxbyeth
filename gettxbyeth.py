@@ -80,7 +80,7 @@ def addHtmlStart(settings):
 </tr>
 <tr>
     <td>ETH range:</td>
-    <td>{ethmin}-{ethmax} ETH ({ethmin_wei}-{ethmax} wei) </td>
+    <td>{ethmin}-{ethmax} ETH ({ethmin_wei}-{ethmax_wei} wei) </td>
 </tr>
 </table>
 
@@ -131,7 +131,7 @@ Elapsed time: {data[3]}
 </tr>
 <tr>
     <td> Total ETHs transfered:</td>
-    <td>{w3.fromWei(sumofeth,'ether')} ({sumofeth})</td>
+    <td>{w3.fromWei(sumofeth,'ether')} ETH ({sumofeth} wei)</td>
 </tr>
 
 </table>
@@ -190,8 +190,8 @@ if __name__ == "__main__":
     #etherOptions.add_argument("-q","--wei-min", help="Minimum ether value in wei to filter for", type=float)
     #etherOptions.add_argument("-e","--wei-max", help="Maximum ether value in wei to filter for", type=float)
     
-    outputOptions.add_argument("-oT","--out-etherscanio", help="Generate etherscan.io link for the tx", action="store_true")
-    outputOptions.add_argument("-oB","--out-block", help="Generate etherscan.io link for the block", action="store_true")
+    outputOptions.add_argument("-oT","--out-txlink", help="Generate etherscan.io link for the tx", action="store_true")
+    outputOptions.add_argument("-oB","--out-blocklink", help="Generate etherscan.io link for the block", action="store_true")
     outputOptions.add_argument("-oH","--out-html", help="Generate html output", metavar="<filename>")
     outputOptions.add_argument("-oF","--out-console", help="Save console output", metavar="<filename>")
     outputOptions.add_argument("-oC","--out-csv", help="Save csv output", metavar="<filename>")
@@ -349,7 +349,7 @@ if __name__ == "__main__":
         block = w3.eth.getBlock(blocknum)
         write_to_console(F"### Block no. {block.number} ###")
         write_to_console(F"[*] No. of txs in block: {len(block.transactions)}")
-        if p.out_block:
+        if p.out_blocklink:
             write_to_console(F"[*] {getBlockLink(block.number)}", end="\n\n")
         sumofethinblock = 0
         numoftxinblock = 0
@@ -365,7 +365,7 @@ if __name__ == "__main__":
                    
                    write_to_console(F"{txstr}: {w3.fromWei(t.value,'ether')} ETH ({t.value} wei)")
                    
-                   if p.out_etherscanio:
+                   if p.out_txlink:
                        write_to_console(F"{getTxLink(txstr)}", end="\n\n")  
                    
                    sumofeth += t.value
