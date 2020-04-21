@@ -25,18 +25,18 @@ You can use any type of provider (http, ws, ipc), the script guesses the type. O
 
 `-l`: Select the latest block. You can specify how many blocks to look back.
 
-Latest block:
+_Latest block:_
 > ./gettxbyeth.py -p "provider" -l      
 
-Last 5 blocks:
+_Last 5 blocks:_
 > ./gettxbyeth.py -p "provider" -l 5     
 
 `-v`, `-n`: Sets the lower and higher end of the block range (inclusive), block number is expected. The default is the latest block in both cases.
 
-Block range: 11111-22222
+_Block range: 11111-22222_
 > ./gettxbyeth.py -p "provider" -v 11111 -n 22222     
 
-Block range: 5555555-latest block
+_Block range: 5555555-latest block_
 > ./gettxbyeth.py -p "provider" -v 5555555            
 
 ## Ether settings
@@ -47,15 +47,15 @@ Block range: 5555555-latest block
 
 `-E`: Set the exact ETH value to filter for.
 
-Search for transactions with exactly 5 ETH only:
+_Search for transactions with exactly 5 ETH only:_
 > ./gettxbyeth.py -p "provider" -E 5    
 
 `-w`, `-r`: Set the minimum and maximum ETH to filter for (inclusive). The default value for the minimum is 0, for the maximum is 'no upper limit'.
 
-List transactions between 5 and 10 ETH:
+_List transactions between 5 and 10 ETH:_
 > ./gettxbyeth.py -p "provider" -w 5 -r 10    
 
-List transactions that transfer 5 ETH or above:
+_List transactions that transfer 5 ETH or above:_
 > ./gettxbyeth.py -p "provider" -w 5           
 
 ## Output settings
@@ -64,16 +64,16 @@ List transactions that transfer 5 ETH or above:
 
 `-oF`, `-oH`, `-oC`, `-oA`: Saves results to file. Respectively: console output, HTML, CVS, all of the above.
 
-Copies the console output to file:
+_Copies the console output to file:_
 > ./gettxbyeth.py -p "provider" -oF console.txt       
 
-Generates an HTML output:
+_Generates an HTML output:_
 > ./gettxbyeth.py -p "provider" -oH output.html      
 
-Generates a CSV output. The field delimiter is ';':
+_Generates a CSV output. The field delimiter is ';':_
 > ./gettxbyeth.py -p "provider" -oC output.csv        
 
-Generates three files: output.txt, output.html, output.csv:
+_Generates three files: output.txt, output.html, output.csv:_
 > ./gettxbyeth.py -p "provider" -oA output            
 
 The CSV output contains the transaction values in ETH and wei, the transaction hash, the block number that contains the transaction, and links to etherscan.io for both.
