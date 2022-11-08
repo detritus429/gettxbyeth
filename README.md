@@ -41,7 +41,7 @@ _Block range: 5555555-latest block_
 
 ## Ether settings
 
-`-s`: Ignore transactions with 0 ETH value. Other ether options still aply.
+`-s`: Ignore transactions with 0 ETH value. Other ether options still apply.
 
 `-0`: List transactions with 0 ETH only. Other ether options are ignored.
 
